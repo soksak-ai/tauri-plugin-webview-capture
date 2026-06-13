@@ -1,0 +1,5 @@
+"$schema" = "schemas/schema.json"
+
+[default]
+description = "webview 캡처 명령(snapshot / record / set_occlusion) 허용."
+permissions = ["allow-snapshot", "allow-record", "allow-set-occlusion"]

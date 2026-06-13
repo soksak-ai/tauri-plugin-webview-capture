@@ -1,0 +1,5 @@
+/target
+Cargo.lock
+
+# local-only working notes (never committed)
+secret/

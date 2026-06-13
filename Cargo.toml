@@ -1,0 +1,50 @@
+# 독립 저장소 — 자체 workspace 루트(상위 디렉터리 워크스페이스에 흡수되지 않도록 빈 [workspace]).
+[workspace]
+
+[package]
+name = "tauri-plugin-webview-capture"
+version = "0.0.1"
+description = "Tauri 2 플러그인 — webview 렌더(DOM+WebGL)를 PNG 로 캡처. 창이 다른 앱에 완전히 가려져도(occluded) 캡처된다(macOS). snapshot / record(연사) / set_occlusion."
+edition = "2021"
+license = "MIT"
+rust-version = "1.77"
+repository = "https://github.com/soksak-ai/tauri-plugin-webview-capture"
+# 필수 — 이 키가 있어야 build.rs 의 cargo:permission_files 메타데이터가 의존 크레이트
+# (앱)의 tauri-build 로 전달돼 webview-capture:default 권한이 인식된다.
+links = "tauri-plugin-webview-capture"
+categories = ["gui", "multimedia"]
+keywords = ["tauri", "plugin", "webview", "screenshot", "capture"]
+
+[dependencies]
+tauri = { version = "2" }
+serde = { version = "1", features = ["derive"] }
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }
+
+# macOS — WKWebView.takeSnapshotWithConfiguration + _setWindowOcclusionDetectionEnabled.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = "0.3"
+objc2-web-kit = { version = "0.3", features = ["block2"] }
+objc2-app-kit = "0.3"
+block2 = "0.6"
+
+# Windows — WebView2 ICoreWebView2.CapturePreview(PNG) → IStream → 파일.
+# 버전은 tauri 2.11.x(wry)가 쓰는 바로 그 버전이라야 controller() 반환형과 일치한다.
+[target.'cfg(windows)'.dependencies]
+webview2-com = "0.38"
+windows-core = "0.61"
+windows = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_System_Com",
+    "Win32_UI_Shell",
+] }
+
+# Linux — WebKitGTK(GTK3) WebViewExt::get_snapshot → cairo::Surface → PNG.
+# webkit2gtk 2.0 = wry 가 쓰는 세대. cairo 는 재노출 안 되므로 cairo-rs 직접 의존.
+[target.'cfg(target_os = "linux")'.dependencies]
+webkit2gtk = "2.0"
+cairo-rs = "0.18"
+gio = "0.18"
+glib = "0.18"
