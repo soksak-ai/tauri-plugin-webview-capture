@@ -1,11 +1,11 @@
 // macOS 캡처 — WKWebView.takeSnapshotWithConfiguration → NSImage → PNG.
 // 가림감지 토글은 _setWindowOcclusionDetectionEnabled(WKWebView 사적 API): 끄면 창이
 // 완전히 덮여도 렌더를 유지해 캡처 가능. 비 App Store 앱이라 허용.
-use tauri::{AppHandle, Manager, Runtime};
+use tauri::{Runtime, WebviewWindow};
 
-// 가림 감지 토글(동기). enabled=false 면 덮여도 렌더 유지 → 캡처 가능.
-pub(crate) fn set_occlusion<R: Runtime>(app: &AppHandle<R>, enabled: bool) -> Result<(), String> {
-    let win = app.get_webview_window("main").ok_or("main webview 없음")?;
+// 가림 감지 토글(동기). enabled=false 면 덮여도 렌더 유지 → 캡처 가능. win = 대상 창(MW2 — 호출 창
+// 자동 인지, 단일 "main" 가정 제거).
+pub(crate) fn set_occlusion<R: Runtime>(win: &WebviewWindow<R>, enabled: bool) -> Result<(), String> {
     win.with_webview(move |pw| unsafe {
         use objc2::msg_send;
         use objc2::runtime::AnyObject;
@@ -16,8 +16,8 @@ pub(crate) fn set_occlusion<R: Runtime>(app: &AppHandle<R>, enabled: bool) -> Re
 }
 
 // 캡처 직전: 가림감지를 끄고 렌더 재개 여유(200ms). 끝나면 disarm 으로 복원.
-pub(crate) async fn arm_capture<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
-    set_occlusion(app, false)?;
+pub(crate) async fn arm_capture<R: Runtime>(win: &WebviewWindow<R>) -> Result<(), String> {
+    set_occlusion(win, false)?;
     tauri::async_runtime::spawn_blocking(|| {
         std::thread::sleep(std::time::Duration::from_millis(200))
     })
@@ -26,17 +26,16 @@ pub(crate) async fn arm_capture<R: Runtime>(app: &AppHandle<R>) -> Result<(), St
 }
 
 // 캡처 후: 가림감지 복원(실패는 무시 — 캡처 결과를 가리지 않는다).
-pub(crate) fn disarm_capture<R: Runtime>(app: &AppHandle<R>) {
-    let _ = set_occlusion(app, true);
+pub(crate) fn disarm_capture<R: Runtime>(win: &WebviewWindow<R>) {
+    let _ = set_occlusion(win, true);
 }
 
 // 단일 네이티브 캡처 → path. 완료 핸들러(블록)가 sync_channel 로 결과를 보내고
 // 본체는 spawn_blocking 에서 기다린다 — with_webview 클로저(메인 스레드)를 막지 않는다.
-pub(crate) async fn capture<R: Runtime>(app: &AppHandle<R>, path: &str) -> Result<(), String> {
+pub(crate) async fn capture<R: Runtime>(win: &WebviewWindow<R>, path: &str) -> Result<(), String> {
     use std::sync::mpsc;
     use std::time::Duration;
 
-    let win = app.get_webview_window("main").ok_or("main webview 없음")?;
     let (tx, rx) = mpsc::sync_channel::<Result<(), String>>(1);
     let out = path.to_string();
 
