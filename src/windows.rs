@@ -6,9 +6,9 @@
 //   - STATSTG::default() 파생 여부(windows 0.61 에서 성립 예상; 아니면 mem::zeroed).
 //   - controller()/windows 버전 동일성(cargo tree -d 로 webview2-com 중복 없어야).
 // 크레이트 버전은 tauri 2.11.x(wry)의 Cargo.lock 과 일치하도록 핀(0.38/0.61).
-use tauri::{Runtime, WebviewWindow};
+use tauri::{Runtime, Webview};
 
-pub(crate) async fn capture<R: Runtime>(win: &WebviewWindow<R>, path: &str) -> Result<(), String> {
+pub(crate) async fn capture<R: Runtime>(win: &Webview<R>, path: &str) -> Result<(), String> {
     use std::sync::mpsc;
     use std::time::Duration;
 
@@ -107,13 +107,13 @@ fn read_istream_all(
 
 // 가림 감지: Windows 엔 macOS 식 occlusion 스로틀이 없다(최소화/숨김 때만 멈춤) → no-op.
 // put_IsVisible 는 가시성 제어라 캡처와 반대 방향 — 안 건드린다.
-pub(crate) fn set_occlusion<R: Runtime>(_win: &WebviewWindow<R>, _enabled: bool) -> Result<(), String> {
+pub(crate) fn set_occlusion<R: Runtime>(_win: &Webview<R>, _enabled: bool) -> Result<(), String> {
     Ok(())
 }
 
 // 캡처 직전 준비(비-macOS). 끌 가림감지는 없지만 흐름을 macOS 와 동일하게 유지하고
 // 직전 레이아웃 변화가 렌더에 반영될 여유(200ms)를 준다.
-pub(crate) async fn arm_capture<R: Runtime>(_win: &WebviewWindow<R>) -> Result<(), String> {
+pub(crate) async fn arm_capture<R: Runtime>(_win: &Webview<R>) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(|| {
         std::thread::sleep(std::time::Duration::from_millis(200))
     })
@@ -121,4 +121,4 @@ pub(crate) async fn arm_capture<R: Runtime>(_win: &WebviewWindow<R>) -> Result<(
     .map_err(|e| e.to_string())
 }
 
-pub(crate) fn disarm_capture<R: Runtime>(_win: &WebviewWindow<R>) {}
+pub(crate) fn disarm_capture<R: Runtime>(_win: &Webview<R>) {}

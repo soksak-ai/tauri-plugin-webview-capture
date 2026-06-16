@@ -1,6 +1,6 @@
 use crate::error::{Error, Result};
 use crate::platform;
-use tauri::{Runtime, WebviewWindow};
+use tauri::{Runtime, Webview};
 
 // 부모 디렉터리 보장 — 명령이 자급자족(호출자 mkdir 불필요).
 fn ensure_parent(path: &str) -> Result<()> {
@@ -16,7 +16,7 @@ fn ensure_parent(path: &str) -> Result<()> {
 /// 다른 앱에 완전히 가려져 있어도 캡처된다(캡처 순간만 가림감지 자동 해제→복원, macOS). WebGL 포함.
 #[tauri::command]
 pub async fn snapshot<R: Runtime>(
-    webview_window: WebviewWindow<R>,
+    webview_window: Webview<R>,
     path: String,
 ) -> Result<String> {
     ensure_parent(&path)?;
@@ -31,7 +31,7 @@ pub async fn snapshot<R: Runtime>(
 /// 렌더된다(연사 동안 가림감지 해제, macOS). 반환=찍은 프레임 수.
 #[tauri::command]
 pub async fn record<R: Runtime>(
-    webview_window: WebviewWindow<R>,
+    webview_window: Webview<R>,
     dir: String,
     frames: u32,
     interval_ms: u64,
@@ -65,6 +65,6 @@ pub async fn record<R: Runtime>(
 /// (상시 백그라운드 캡처용 — 배터리 비용 주의). Windows/Linux 엔 동등 스로틀이 없어
 /// no-op. snapshot/record 는 캡처 순간만 자동으로 끄므로 평소엔 불필요.
 #[tauri::command]
-pub fn set_occlusion<R: Runtime>(webview_window: WebviewWindow<R>, enabled: bool) -> Result<()> {
+pub fn set_occlusion<R: Runtime>(webview_window: Webview<R>, enabled: bool) -> Result<()> {
     platform::set_occlusion(&webview_window, enabled).map_err(Error::Capture)
 }

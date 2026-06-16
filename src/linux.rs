@@ -4,9 +4,9 @@
 // 가장 가능성 높은 실패점: 메서드명 get_snapshot(신세대 gtk-rs 는 snapshot) —
 // webkit2gtk 2.0.2(wry 가 쓰는 세대)에선 get_snapshot 으로 조사됨. cairo-rs 버전이
 // webkit2gtk 의 transitive cairo 와 같아야 try_from 이 타입 일치(0.18 핀).
-use tauri::{Runtime, WebviewWindow};
+use tauri::{Runtime, Webview};
 
-pub(crate) async fn capture<R: Runtime>(win: &WebviewWindow<R>, path: &str) -> Result<(), String> {
+pub(crate) async fn capture<R: Runtime>(win: &Webview<R>, path: &str) -> Result<(), String> {
     use std::sync::mpsc;
     use std::time::Duration;
 
@@ -59,11 +59,11 @@ pub(crate) async fn capture<R: Runtime>(win: &WebviewWindow<R>, path: &str) -> R
 }
 
 // 가림 감지: Linux(WebKitGTK)엔 macOS 식 occlusion 스로틀이 없다(최소화/숨김 때만) → no-op.
-pub(crate) fn set_occlusion<R: Runtime>(_win: &WebviewWindow<R>, _enabled: bool) -> Result<(), String> {
+pub(crate) fn set_occlusion<R: Runtime>(_win: &Webview<R>, _enabled: bool) -> Result<(), String> {
     Ok(())
 }
 
-pub(crate) async fn arm_capture<R: Runtime>(_win: &WebviewWindow<R>) -> Result<(), String> {
+pub(crate) async fn arm_capture<R: Runtime>(_win: &Webview<R>) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(|| {
         std::thread::sleep(std::time::Duration::from_millis(200))
     })
@@ -71,4 +71,4 @@ pub(crate) async fn arm_capture<R: Runtime>(_win: &WebviewWindow<R>) -> Result<(
     .map_err(|e| e.to_string())
 }
 
-pub(crate) fn disarm_capture<R: Runtime>(_win: &WebviewWindow<R>) {}
+pub(crate) fn disarm_capture<R: Runtime>(_win: &Webview<R>) {}
