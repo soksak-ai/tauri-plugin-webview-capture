@@ -1,12 +1,13 @@
 ## Default Permission
 
-webview 캡처 명령(snapshot / record / set_occlusion) 허용.
+webview 캡처·분석 명령(snapshot / record / set_occlusion / analyze_regions) 허용.
 
 #### This default permission set includes the following:
 
 - `allow-snapshot`
 - `allow-record`
 - `allow-set-occlusion`
+- `allow-analyze-regions`
 
 ## Permission Table
 
@@ -16,6 +17,32 @@ webview 캡처 명령(snapshot / record / set_occlusion) 허용.
 <th>Description</th>
 </tr>
 
+
+<tr>
+<td>
+
+`webview-capture:allow-analyze-regions`
+
+</td>
+<td>
+
+Enables the analyze_regions command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`webview-capture:deny-analyze-regions`
+
+</td>
+<td>
+
+Denies the analyze_regions command without any pre-configured scope.
+
+</td>
+</tr>
 
 <tr>
 <td>

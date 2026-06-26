@@ -38,6 +38,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::snapshot,
             commands::record,
             commands::set_occlusion,
+            commands::analyze_regions,
         ])
         .build()
 }
