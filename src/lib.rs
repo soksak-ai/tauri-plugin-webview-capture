@@ -39,6 +39,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::record,
             commands::set_occlusion,
             commands::analyze_regions,
+            commands::analyze_frame_diffs,
         ])
         .build()
 }

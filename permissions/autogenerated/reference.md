@@ -8,6 +8,7 @@ webview 캡처·분석 명령(snapshot / record / set_occlusion / analyze_region
 - `allow-record`
 - `allow-set-occlusion`
 - `allow-analyze-regions`
+- `allow-analyze-frame-diffs`
 
 ## Permission Table
 
@@ -17,6 +18,32 @@ webview 캡처·분석 명령(snapshot / record / set_occlusion / analyze_region
 <th>Description</th>
 </tr>
 
+
+<tr>
+<td>
+
+`webview-capture:allow-analyze-frame-diffs`
+
+</td>
+<td>
+
+Enables the analyze_frame_diffs command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`webview-capture:deny-analyze-frame-diffs`
+
+</td>
+<td>
+
+Denies the analyze_frame_diffs command without any pre-configured scope.
+
+</td>
+</tr>
 
 <tr>
 <td>

@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-analyze-frame-diffs"
+description = "Enables the analyze_frame_diffs command without any pre-configured scope."
+commands.allow = ["analyze_frame_diffs"]
+
+[[permission]]
+identifier = "deny-analyze-frame-diffs"
+description = "Denies the analyze_frame_diffs command without any pre-configured scope."
+commands.deny = ["analyze_frame_diffs"]

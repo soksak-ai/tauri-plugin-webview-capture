@@ -110,12 +110,17 @@ fn analyze_blocking(dir: &str, regions: &[Region]) -> Result<Vec<Vec<f64>>> {
     Ok(out)
 }
 
+fn region_bounds(w: u32, h: u32, r: &Region) -> (u32, u32, u32, u32) {
+    let c = |v: f64| v.clamp(0.0, 1.0);
+    let x0 = (c(r.x0) * w as f64) as u32;
+    let y0 = (c(r.y0) * h as f64) as u32;
+    let x1 = ((c(r.x1) * w as f64) as u32).min(w);
+    let y1 = ((c(r.y1) * h as f64) as u32).min(h);
+    (x0, y0, x1, y1)
+}
+
 fn region_mean(img: &image::GrayImage, w: u32, h: u32, r: &Region) -> f64 {
-    let clampf = |v: f64| v.clamp(0.0, 1.0);
-    let x0 = (clampf(r.x0) * w as f64) as u32;
-    let y0 = (clampf(r.y0) * h as f64) as u32;
-    let x1 = ((clampf(r.x1) * w as f64) as u32).min(w);
-    let y1 = ((clampf(r.y1) * h as f64) as u32).min(h);
+    let (x0, y0, x1, y1) = region_bounds(w, h, r);
     let mut sum = 0u64;
     let mut cnt = 0u64;
     for y in y0..y1 {
@@ -128,5 +133,74 @@ fn region_mean(img: &image::GrayImage, w: u32, h: u32, r: &Region) -> f64 {
         0.0
     } else {
         sum as f64 / cnt as f64
+    }
+}
+
+/// `dir` 의 연속 프레임마다, 각 영역에서 *직전 프레임과 다른* 픽셀(luma 차 > thresh)의 비율(0..1)을 계산.
+/// 반환 = frames × regions(첫 프레임 행은 0). 콘텐츠 *전환*·애니메이션 같은 변화 감지용 — 밝기로는 구별
+/// 안 되는 같은-색 콘텐츠끼리의 전환도 픽셀 차이로 잡는다(탭 전환이 단일 프레임에 끝나는지/번지는지 판정).
+#[tauri::command]
+pub async fn analyze_frame_diffs(
+    dir: String,
+    regions: Vec<Region>,
+    thresh: Option<u8>,
+) -> Result<Vec<Vec<f64>>> {
+    let t = thresh.unwrap_or(30);
+    tauri::async_runtime::spawn_blocking(move || frame_diffs_blocking(&dir, &regions, t))
+        .await
+        .map_err(|e| Error::Capture(format!("join: {e}")))?
+}
+
+fn frame_diffs_blocking(dir: &str, regions: &[Region], thresh: u8) -> Result<Vec<Vec<f64>>> {
+    let mut out: Vec<Vec<f64>> = Vec::new();
+    let mut prev: Option<image::GrayImage> = None;
+    let mut i = 0u32;
+    loop {
+        let p = format!("{dir}/f{i:04}.png");
+        if !std::path::Path::new(&p).exists() {
+            break;
+        }
+        let img = image::open(&p)
+            .map_err(|e| Error::Capture(format!("{p}: {e}")))?
+            .to_luma8();
+        let (w, h) = img.dimensions();
+        let row: Vec<f64> = regions
+            .iter()
+            .map(|r| match &prev {
+                None => 0.0,
+                Some(pv) if pv.dimensions() != img.dimensions() => 1.0,
+                Some(pv) => region_changed_frac(&img, pv, w, h, r, thresh),
+            })
+            .collect();
+        out.push(row);
+        prev = Some(img);
+        i += 1;
+    }
+    Ok(out)
+}
+
+fn region_changed_frac(
+    cur: &image::GrayImage,
+    prev: &image::GrayImage,
+    w: u32,
+    h: u32,
+    r: &Region,
+    thresh: u8,
+) -> f64 {
+    let (x0, y0, x1, y1) = region_bounds(w, h, r);
+    let mut changed = 0u64;
+    let mut cnt = 0u64;
+    for y in y0..y1 {
+        for x in x0..x1 {
+            if cur.get_pixel(x, y)[0].abs_diff(prev.get_pixel(x, y)[0]) > thresh {
+                changed += 1;
+            }
+            cnt += 1;
+        }
+    }
+    if cnt == 0 {
+        0.0
+    } else {
+        changed as f64 / cnt as f64
     }
 }

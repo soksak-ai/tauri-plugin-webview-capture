@@ -295,6 +295,18 @@
       "type": "string",
       "oneOf": [
         {
+          "description": "Enables the analyze_frame_diffs command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-analyze-frame-diffs",
+          "markdownDescription": "Enables the analyze_frame_diffs command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the analyze_frame_diffs command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-analyze-frame-diffs",
+          "markdownDescription": "Denies the analyze_frame_diffs command without any pre-configured scope."
+        },
+        {
           "description": "Enables the analyze_regions command without any pre-configured scope.",
           "type": "string",
           "const": "allow-analyze-regions",
@@ -343,10 +355,10 @@
           "markdownDescription": "Denies the snapshot command without any pre-configured scope."
         },
         {
-          "description": "webview 캡처·분석 명령(snapshot / record / set_occlusion / analyze_regions) 허용.\n#### This default permission set includes:\n\n- `allow-snapshot`\n- `allow-record`\n- `allow-set-occlusion`\n- `allow-analyze-regions`",
+          "description": "webview 캡처·분석 명령(snapshot / record / set_occlusion / analyze_regions) 허용.\n#### This default permission set includes:\n\n- `allow-snapshot`\n- `allow-record`\n- `allow-set-occlusion`\n- `allow-analyze-regions`\n- `allow-analyze-frame-diffs`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "webview 캡처·분석 명령(snapshot / record / set_occlusion / analyze_regions) 허용.\n#### This default permission set includes:\n\n- `allow-snapshot`\n- `allow-record`\n- `allow-set-occlusion`\n- `allow-analyze-regions`"
+          "markdownDescription": "webview 캡처·분석 명령(snapshot / record / set_occlusion / analyze_regions) 허용.\n#### This default permission set includes:\n\n- `allow-snapshot`\n- `allow-record`\n- `allow-set-occlusion`\n- `allow-analyze-regions`\n- `allow-analyze-frame-diffs`"
         }
       ]
     }

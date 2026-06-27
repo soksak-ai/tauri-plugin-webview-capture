@@ -7,4 +7,5 @@ permissions = [
     "allow-record",
     "allow-set-occlusion",
     "allow-analyze-regions",
+    "allow-analyze-frame-diffs",
 ]
