@@ -1,26 +1,19 @@
-// macOS 캡처 — CGWindowListCreateImage(창 전체). OS 컴포지터가 메인 webview + 모든 child
-// webview(브라우저 뷰 등)를 합성한 창 이미지를 준다 → 콘텐츠 종류 무관 빠짐없이 캡처(메인 webview
-// 만 잡던 takeSnapshot 의 hole 문제 해결). 가림감지 토글(_setWindowOcclusionDetectionEnabled,
-// WKWebView 사적 API)로 완전히 덮여도 렌더 유지. 비 App Store 앱이라 허용.
+// macOS 캡처 — ScreenCaptureKit(SCScreenshotManager, macOS 14+). OS 컴포지터가 메인 webview + 모든 child
+// webview(브라우저 뷰 등)를 합성한 창 이미지를 *논블로킹* 으로 준다 → 콘텐츠 종류 무관 빠짐없이 캡처(메인
+// webview 만 잡던 takeSnapshot 의 hole 해결) + 렌더 중에도 멈추지 않는다. 구 CGWindowListCreateImage 는
+// macOS 15 에서 obsolete + 블로킹/고부하라, 콘텐츠 전환의 무거운 렌더 중엔 WindowServer 와 경합해 호출당
+// ~5s 로 늘어졌고(프레임 누적 hang) → SCK 컴포지터 경로로 교체. 가림감지 토글
+// (_setWindowOcclusionDetectionEnabled, WKWebView 사적 API)로 완전히 덮여도 렌더 유지. 비 App Store 라 허용.
+use block2::RcBlock;
+use objc2::rc::Retained;
 use objc2::runtime::AnyObject;
-use objc2_foundation::{NSPoint, NSRect, NSSize};
+use objc2::AllocAnyThread;
+use objc2_core_graphics::CGImage;
+use objc2_foundation::{NSError, NSRect};
+use objc2_screen_capture_kit::{
+    SCContentFilter, SCScreenshotManager, SCShareableContent, SCStreamConfiguration, SCWindow,
+};
 use tauri::{Runtime, Webview};
-
-#[link(name = "CoreGraphics", kind = "framework")]
-extern "C" {
-    fn CGWindowListCreateImage(
-        bounds: NSRect,
-        list_option: u32,
-        window_id: u32,
-        image_option: u32,
-    ) -> *mut AnyObject; // CGImageRef(opaque)
-    fn CGImageRelease(image: *mut AnyObject);
-}
-
-// CGWindowListOption / CGWindowImageOption 상수(CGWindow.h).
-const INCLUDING_WINDOW: u32 = 1 << 3; // kCGWindowListOptionIncludingWindow
-const IGNORE_FRAMING: u32 = 1 << 0; // kCGWindowImageBoundsIgnoreFraming
-const BEST_RESOLUTION: u32 = 1 << 3; // kCGWindowImageBestResolution(retina)
 
 // 가림 감지 토글(동기). enabled=false 면 덮여도 렌더 유지 → 캡처 가능. win = 대상 창(MW2 — 호출 창
 // 자동 인지, 단일 "main" 가정 제거).
@@ -46,22 +39,35 @@ pub(crate) fn disarm_capture<R: Runtime>(win: &Webview<R>) {
     let _ = set_occlusion(win, true);
 }
 
-// 창 전체(모든 child webview 합성)를 PNG 로 저장.
+// 창 전체(모든 child webview 합성)를 PNG 로 저장. 메인스레드에서 대상 창 정보만 빠르게 뽑고(NSWindow
+// 접근), 실제 캡처는 ScreenCaptureKit(off-main, 논블로킹)으로 한다 → 전환 렌더와 경합하지 않아 안 멈춘다.
 pub(crate) async fn capture<R: Runtime>(win: &Webview<R>, path: &str) -> Result<(), String> {
     use std::sync::mpsc;
     use std::time::Duration;
 
-    let (tx, rx) = mpsc::sync_channel::<Result<(), String>>(1);
-    let out = path.to_string();
-
+    // 1) 메인스레드: 대상 창의 CGWindowID + 픽셀 크기(frame × backingScale).
+    let (tx_info, rx_info) = mpsc::sync_channel::<Result<WindowInfo, String>>(1);
     win.with_webview(move |pw| {
-        let r = unsafe { capture_window(pw.inner() as *mut AnyObject, &out) };
-        let _ = tx.try_send(r);
+        let r = unsafe { window_info(pw.inner() as *mut AnyObject) };
+        let _ = tx_info.try_send(r);
     })
     .map_err(|e| e.to_string())?;
+    let info = tauri::async_runtime::spawn_blocking(move || {
+        rx_info
+            .recv_timeout(Duration::from_secs(3))
+            .map_err(|_| "창 정보 조회 시간 초과".to_string())?
+    })
+    .await
+    .map_err(|e| e.to_string())??;
 
+    // 2) ScreenCaptureKit 캡처. 완료 핸들러(getShareableContent → captureImage) 체인을 채널로 받는다.
+    //    SCK 가 항상 완료를 호출하므로 채널은 막히지 않는다(timeout 은 만일의 stuck 대비 backstop 일 뿐 —
+    //    렌더 중 hang 의 근본 해결은 블로킹 CGWindowListCreateImage 를 버린 것).
+    let out = path.to_string();
+    let (tx, rx) = mpsc::sync_channel::<Result<(), String>>(1);
+    capture_via_sck(info, out, tx);
     tauri::async_runtime::spawn_blocking(move || {
-        rx.recv_timeout(Duration::from_secs(5))
+        rx.recv_timeout(Duration::from_secs(8))
             .map_err(|_| "snapshot 시간 초과".to_string())?
     })
     .await
@@ -69,14 +75,15 @@ pub(crate) async fn capture<R: Runtime>(win: &Webview<R>, path: &str) -> Result<
     Ok(())
 }
 
-// 메인 스레드(with_webview 클로저)에서 동기 실행. wk = WKWebView 포인터.
-unsafe fn capture_window(wk: *mut AnyObject, out: &str) -> Result<(), String> {
-    use objc2::rc::Retained;
-    use objc2::{class, msg_send};
-    use objc2_app_kit::NSBitmapImageFileType;
-    use objc2_foundation::{NSData, NSString};
+struct WindowInfo {
+    id: u32,
+    width: usize,
+    height: usize,
+}
 
-    // 호출 webview 의 NSWindow → windowNumber(CGWindowID).
+// 메인 스레드(with_webview 클로저)에서 동기 실행. wk = WKWebView → NSWindow.
+unsafe fn window_info(wk: *mut AnyObject) -> Result<WindowInfo, String> {
+    use objc2::msg_send;
     let nswindow: *mut AnyObject = msg_send![&*wk, window];
     if nswindow.is_null() {
         return Err("NSWindow 없음".into());
@@ -85,24 +92,75 @@ unsafe fn capture_window(wk: *mut AnyObject, out: &str) -> Result<(), String> {
     if num <= 0 {
         return Err("windowNumber 무효".into());
     }
+    let scale: f64 = msg_send![&*nswindow, backingScaleFactor];
+    let frame: NSRect = msg_send![&*nswindow, frame];
+    let scale = if scale > 0.0 { scale } else { 1.0 };
+    Ok(WindowInfo {
+        id: num as u32,
+        width: ((frame.size.width * scale).round() as usize).max(1),
+        height: ((frame.size.height * scale).round() as usize).max(1),
+    })
+}
 
-    // bounds=CGRectNull({{INF,INF},{0,0}}) → 창 경계 자동. 창만 포함 + 프레임 무시 + 고해상도.
-    let null_rect = NSRect::new(NSPoint::new(f64::INFINITY, f64::INFINITY), NSSize::new(0.0, 0.0));
-    let cg = CGWindowListCreateImage(
-        null_rect,
-        INCLUDING_WINDOW,
-        num as u32,
-        IGNORE_FRAMING | BEST_RESOLUTION,
-    );
-    if cg.is_null() {
-        return Err("CGWindowListCreateImage nil".into());
-    }
+// SCK 비동기 캡처 체인 — 호출 즉시 반환, 완료 시 tx 로 결과. getShareableContent → 창 매칭 → 단일창
+// 필터 → captureImage(CGImage) → PNG. 블록은 프레임워크가 복사·보관하므로 RcBlock 이 즉시 drop 돼도 안전.
+fn capture_via_sck(info: WindowInfo, out: String, tx: std::sync::mpsc::SyncSender<Result<(), String>>) {
+    let handler = RcBlock::new(move |content: *mut SCShareableContent, err: *mut NSError| {
+        if content.is_null() || !err.is_null() {
+            let _ = tx.try_send(Err("getShareableContent 실패".into()));
+            return;
+        }
+        let content = unsafe { &*content };
+        let windows = unsafe { content.windows() };
+        let mut target: Option<Retained<SCWindow>> = None;
+        for w in &windows {
+            if unsafe { w.windowID() } == info.id {
+                target = Some(w);
+                break;
+            }
+        }
+        let Some(w) = target else {
+            let _ = tx.try_send(Err(format!("창 {} 못 찾음(권한?)", info.id)));
+            return;
+        };
+        let filter =
+            unsafe { SCContentFilter::initWithDesktopIndependentWindow(SCContentFilter::alloc(), &w) };
+        let cfg = unsafe { SCStreamConfiguration::new() };
+        unsafe {
+            cfg.setWidth(info.width);
+            cfg.setHeight(info.height);
+        }
+        let tx2 = tx.clone();
+        let out2 = out.clone();
+        let cap = RcBlock::new(move |img: *mut CGImage, err2: *mut NSError| {
+            if img.is_null() || !err2.is_null() {
+                let _ = tx2.try_send(Err("captureImage 실패".into()));
+                return;
+            }
+            let _ = tx2.try_send(unsafe { cgimage_to_png(img, &out2) });
+        });
+        unsafe {
+            SCScreenshotManager::captureImageWithFilter_configuration_completionHandler(
+                &filter,
+                &cfg,
+                Some(&cap),
+            );
+        }
+    });
+    // getCurrentProcess… = 이 프로세스 자기 창만(자기 캡처). getShareableContent 와 달리 Screen Recording
+    // TCC 권한이 불필요하다(구 CGWindowListCreateImage 가 자기 창엔 권한 없이 됐던 동작을 SCK 로 유지).
+    unsafe { SCShareableContent::getCurrentProcessShareableContentWithCompletionHandler(&handler) };
+}
 
-    // CGImage → NSBitmapImageRep(initWithCGImage). alloc 은 class! + msg_send 로 직접(기존 패턴).
+// CGImage → NSBitmapImageRep → PNG 파일.
+unsafe fn cgimage_to_png(cg: *mut CGImage, out: &str) -> Result<(), String> {
+    use objc2::{class, msg_send};
+    use objc2_app_kit::NSBitmapImageFileType;
+    use objc2_foundation::{NSData, NSString};
+
     let alloc: *mut AnyObject = msg_send![class!(NSBitmapImageRep), alloc];
     let rep_raw: *mut AnyObject = msg_send![alloc, initWithCGImage: cg];
-    CGImageRelease(cg); // initWithCGImage 가 자체 보관 → 원본 해제 안전
-    let rep = Retained::from_raw(rep_raw).ok_or("NSBitmapImageRep nil")?;
+    let rep = Retained::<AnyObject>::from_raw(rep_raw).ok_or("NSBitmapImageRep nil")?;
 
     let png: Option<Retained<NSData>> = msg_send![
         &*rep,

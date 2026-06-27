@@ -24,12 +24,23 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 [build-dependencies]
 tauri-plugin = { version = "2", features = ["build"] }
 
-# macOS — WKWebView.takeSnapshotWithConfiguration + _setWindowOcclusionDetectionEnabled.
+# macOS — ScreenCaptureKit(SCScreenshotManager, macOS 14+)로 창 합성 캡처. CGWindowListCreateImage 는
+# macOS 15 에서 obsolete + 블로킹/고부하라 렌더 중엔 WindowServer 와 경합해 멈췄다 → SCK 는 컴포지터에서
+# 논블로킹으로 합성 프레임을 받아 child webview 도 빠짐없이 잡고 렌더 중에도 hang 하지 않는다.
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
 objc2-foundation = "0.3"
 objc2-web-kit = { version = "0.3", features = ["block2"] }
 objc2-app-kit = "0.3"
+objc2-core-graphics = "0.3"
+objc2-core-foundation = "0.3"
+objc2-screen-capture-kit = { version = "0.3", features = [
+    "SCStream",
+    "SCShareableContent",
+    "block2",
+    "objc2-core-graphics",
+    "objc2-core-foundation",
+] }
 block2 = "0.6"
 
 # Windows — WebView2 ICoreWebView2.CapturePreview(PNG) → IStream → 파일.
