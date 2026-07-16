@@ -35,10 +35,13 @@ pub(crate) async fn capture<R: Runtime>(win: &Webview<R>, path: &str) -> Result<
                     SHCreateMemStream(None).ok_or("IStream 생성 실패(SHCreateMemStream)")?;
                 let tx = tx.clone();
                 let cb_stream = stream.clone();
+                // webview2-com 의 CapturePreviewCompletedHandler 콜백은 HRESULT 가 아니라
+                // windows::core::Result<()>(성공/변환된 에러)를 받는다(cargo check 실측 — 기대
+                // 시그니처 fn(Result<(), Error>)). 성공이면 스트림을 읽는다.
                 let handler = CapturePreviewCompletedHandler::create(Box::new(
-                    move |errorcode: windows::core::HRESULT| -> windows::core::Result<()> {
+                    move |status: windows::core::Result<()>| -> windows::core::Result<()> {
                         let result = (|| -> Result<Vec<u8>, String> {
-                            errorcode.ok().map_err(|e| format!("CapturePreview 실패: {e}"))?;
+                            status.map_err(|e| format!("CapturePreview 실패: {e}"))?;
                             read_istream_all(&cb_stream)
                                 .map_err(|e| format!("스트림 읽기 실패: {e}"))
                         })();

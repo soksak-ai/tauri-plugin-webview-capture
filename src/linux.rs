@@ -14,9 +14,10 @@ pub(crate) async fn capture<R: Runtime>(win: &Webview<R>, path: &str) -> Result<
 
     win.with_webview(move |pw| {
         use cairo::ImageSurface;
-        use webkit2gtk::gio::Cancellable;
-        use webkit2gtk::prelude::WebViewExt;
-        use webkit2gtk::{SnapshotOptions, SnapshotRegion};
+        // webkit2gtk 2.0.2(구세대 gtk-rs)엔 prelude 모듈이 없다 — 확장 트레이트를 직접 import 한다.
+        // gio 는 재노출 안 되므로 직접 의존(Cargo.toml gio 0.18)에서 가져온다.
+        use gio::Cancellable;
+        use webkit2gtk::{SnapshotOptions, SnapshotRegion, WebViewExt};
 
         // with_webview 클로저는 GTK 메인 스레드에서 실행된다(tauri 보장).
         // inner() = webkit2gtk::WebView(소유 클론). get_snapshot 은 비동기 — 콜백이
