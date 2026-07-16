@@ -60,6 +60,7 @@ windows = { version = "0.61", features = [
 # webkit2gtk 2.0 = wry 가 쓰는 세대. cairo 는 재노출 안 되므로 cairo-rs 직접 의존.
 [target.'cfg(target_os = "linux")'.dependencies]
 webkit2gtk = "2.0"
-cairo-rs = "0.18"
+# png: ImageSurface::write_to_png 은 feature 게이트다(linux cargo check 실측).
+cairo-rs = { version = "0.18", features = ["png"] }
 gio = "0.18"
 glib = "0.18"
