@@ -1,8 +1,9 @@
-// Linux 캡처 — WebKitGTK(GTK3) WebViewExt::get_snapshot → cairo::Surface → PNG.
+// Linux 캡처 — WebKitGTK(GTK3) WebViewExt::snapshot → cairo::Surface → PNG.
 //
-// [미검증] 이 머신(macOS)에선 컴파일되지 않는다. Linux CI/실기 검증 필요.
-// 가장 가능성 높은 실패점: 메서드명 get_snapshot(신세대 gtk-rs 는 snapshot) —
-// webkit2gtk 2.0.2(wry 가 쓰는 세대)에선 get_snapshot 으로 조사됨. cairo-rs 버전이
+// 컴파일은 소비 앱의 3-OS CI 게이트(ubuntu-24.04 cargo check)로 검증된다 — 첫 실검사가
+// 드러낸 정정: webkit2gtk 2.0.2(gtk-rs 0.18 세대)엔 prelude 모듈이 없고(WebViewExt 직접
+// import) 메서드는 get_ 접두사 없는 snapshot 이며, write_to_png 은 cairo-rs 의 png
+// feature 뒤에 있다. 런타임 캡처 동작은 Linux 실기 검증이 남아 있다. cairo-rs 버전은
 // webkit2gtk 의 transitive cairo 와 같아야 try_from 이 타입 일치(0.18 핀).
 use tauri::{Runtime, Webview};
 

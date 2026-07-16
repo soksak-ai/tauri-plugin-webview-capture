@@ -1,11 +1,10 @@
 // Windows 캡처 — WebView2 ICoreWebView2.CapturePreview(PNG) → IStream → 파일.
 //
-// [미검증] 이 머신(macOS)에선 컴파일되지 않는다. Windows CI/실기 검증 필요.
-// 가장 가능성 높은 실패점:
-//   - CapturePreviewCompletedHandler 클로저 인자 수(HRESULT 1개로 조사됨).
-//   - STATSTG::default() 파생 여부(windows 0.61 에서 성립 예상; 아니면 mem::zeroed).
-//   - controller()/windows 버전 동일성(cargo tree -d 로 webview2-com 중복 없어야).
-// 크레이트 버전은 tauri 2.11.x(wry)의 Cargo.lock 과 일치하도록 핀(0.38/0.61).
+// 컴파일은 소비 앱의 3-OS CI 게이트(windows-2025 cargo check)로 검증된다 —
+// CapturePreviewCompletedHandler 콜백은 HRESULT 가 아니라 windows::core::Result<()>
+// 를 받는다(첫 실검사가 드러낸 정정). 런타임 캡처 동작은 Windows 실기 검증이 남아 있다.
+// 크레이트 버전은 tauri 2.11.x(wry)의 Cargo.lock 과 일치하도록 핀(0.38/0.61) —
+// controller()/windows 버전이 갈리면 타입 불일치(cargo tree -d 로 webview2-com 중복 없어야).
 use tauri::{Runtime, Webview};
 
 pub(crate) async fn capture<R: Runtime>(win: &Webview<R>, path: &str) -> Result<(), String> {
