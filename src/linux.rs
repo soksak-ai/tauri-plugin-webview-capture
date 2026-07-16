@@ -24,7 +24,8 @@ pub(crate) async fn capture<R: Runtime>(win: &Webview<R>, path: &str) -> Result<
         // GLib 메인 컨텍스트에서 호출되며 결과를 sync_channel 로 보낸다(메인 스레드 안 막음).
         let webview = pw.inner();
         let tx = tx.clone();
-        webview.get_snapshot(
+        // webkit2gtk 2.0.2(gtk-rs 0.18 세대)는 get_ 접두사를 뗀 snapshot 이다(cargo check 실측).
+        webview.snapshot(
             SnapshotRegion::Visible,
             SnapshotOptions::NONE,
             // None 을 넘기려면 타입 명시 필요(IsA<Cancellable> 추론 불가).
