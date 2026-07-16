@@ -4,6 +4,7 @@
 description = "webview 캡처·분석 명령(snapshot / record / set_occlusion / analyze_regions) 허용."
 permissions = [
     "allow-snapshot",
+    "allow-snapshot-region",
     "allow-record",
     "allow-set-occlusion",
     "allow-analyze-regions",

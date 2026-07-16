@@ -355,10 +355,22 @@
           "markdownDescription": "Denies the snapshot command without any pre-configured scope."
         },
         {
-          "description": "webview 캡처·분석 명령(snapshot / record / set_occlusion / analyze_regions) 허용.\n#### This default permission set includes:\n\n- `allow-snapshot`\n- `allow-record`\n- `allow-set-occlusion`\n- `allow-analyze-regions`\n- `allow-analyze-frame-diffs`",
+          "description": "Enables the snapshot_region command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-snapshot-region",
+          "markdownDescription": "Enables the snapshot_region command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the snapshot_region command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-snapshot-region",
+          "markdownDescription": "Denies the snapshot_region command without any pre-configured scope."
+        },
+        {
+          "description": "webview 캡처·분석 명령(snapshot / record / set_occlusion / analyze_regions) 허용.\n#### This default permission set includes:\n\n- `allow-snapshot`\n- `allow-snapshot-region`\n- `allow-record`\n- `allow-set-occlusion`\n- `allow-analyze-regions`\n- `allow-analyze-frame-diffs`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "webview 캡처·분석 명령(snapshot / record / set_occlusion / analyze_regions) 허용.\n#### This default permission set includes:\n\n- `allow-snapshot`\n- `allow-record`\n- `allow-set-occlusion`\n- `allow-analyze-regions`\n- `allow-analyze-frame-diffs`"
+          "markdownDescription": "webview 캡처·분석 명령(snapshot / record / set_occlusion / analyze_regions) 허용.\n#### This default permission set includes:\n\n- `allow-snapshot`\n- `allow-snapshot-region`\n- `allow-record`\n- `allow-set-occlusion`\n- `allow-analyze-regions`\n- `allow-analyze-frame-diffs`"
         }
       ]
     }

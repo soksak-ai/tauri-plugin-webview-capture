@@ -36,6 +36,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("webview-capture")
         .invoke_handler(tauri::generate_handler![
             commands::snapshot,
+            commands::snapshot_region,
             commands::record,
             commands::set_occlusion,
             commands::analyze_regions,

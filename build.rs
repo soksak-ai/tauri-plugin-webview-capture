@@ -2,6 +2,7 @@
 // 이름은 commands.rs 의 #[tauri::command] 함수명과 정확히 일치해야 한다.
 const COMMANDS: &[&str] = &[
     "snapshot",
+    "snapshot_region",
     "record",
     "set_occlusion",
     "analyze_regions",

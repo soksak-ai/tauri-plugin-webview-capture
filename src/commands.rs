@@ -61,6 +61,30 @@ pub async fn record<R: Runtime>(
     Ok(n)
 }
 
+/// 호출한 창의 합성 이미지를 논리(CSS px, 창 좌표) rect 로 crop 해 base64 PNG 로 반환
+/// (디스크 미경유). rect 생략 = 창 전체. 가림 상태에서도 캡처(snapshot 과 동일 arm/disarm).
+/// 용도: 네이티브 표면 freeze-frame(드래그 중 시각 연속 스탠드인), 부분 눈검증.
+#[tauri::command]
+pub async fn snapshot_region<R: Runtime>(
+    webview_window: Webview<R>,
+    x: Option<f64>,
+    y: Option<f64>,
+    w: Option<f64>,
+    h: Option<f64>,
+) -> Result<String> {
+    use base64::Engine as _;
+    let rect = match (x, y, w, h) {
+        (Some(x), Some(y), Some(w), Some(h)) => Some((x, y, w, h)),
+        (None, None, None, None) => None,
+        _ => return Err(Error::Capture("rect 는 x/y/w/h 전부 또는 전부 생략".into())),
+    };
+    platform::arm_capture(&webview_window).await.map_err(Error::Capture)?;
+    let r = platform::capture_region_png(&webview_window, rect).await;
+    platform::disarm_capture(&webview_window); // 항상 복원
+    let bytes = r.map_err(Error::Capture)?;
+    Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
+}
+
 /// 가림감지 토글(macOS). false 면 다른 앱에 완전히 가려져도 렌더를 멈추지 않는다
 /// (상시 백그라운드 캡처용 — 배터리 비용 주의). Windows/Linux 엔 동등 스로틀이 없어
 /// no-op. snapshot/record 는 캡처 순간만 자동으로 끄므로 평소엔 불필요.
@@ -179,6 +203,30 @@ fn frame_diffs_blocking(dir: &str, regions: &[Region], thresh: u8) -> Result<Vec
     Ok(out)
 }
 
+/// 논리(CSS px, 창 좌표) 직사각 → 물리(px) crop 사각. 이미지 경계로 클램프.
+/// 폭/높이가 0 이하로 잘리면 None(빈 crop 은 캡처 실패보다 명시적 거절이 낫다).
+pub(crate) fn crop_rect_px(
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+    scale: f64,
+    img_w: usize,
+    img_h: usize,
+) -> Option<(f64, f64, f64, f64)> {
+    if !(scale > 0.0) || w <= 0.0 || h <= 0.0 {
+        return None;
+    }
+    let x0 = (x * scale).max(0.0).min(img_w as f64);
+    let y0 = (y * scale).max(0.0).min(img_h as f64);
+    let x1 = ((x + w) * scale).max(0.0).min(img_w as f64);
+    let y1 = ((y + h) * scale).max(0.0).min(img_h as f64);
+    if x1 - x0 < 1.0 || y1 - y0 < 1.0 {
+        return None;
+    }
+    Some((x0, y0, x1 - x0, y1 - y0))
+}
+
 fn region_changed_frac(
     cur: &image::GrayImage,
     prev: &image::GrayImage,
@@ -202,5 +250,40 @@ fn region_changed_frac(
         0.0
     } else {
         changed as f64 / cnt as f64
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::crop_rect_px;
+
+    #[test]
+    fn 논리를_배율로_물리화한다() {
+        // 2x 디스플레이: 논리 (10,20,100,50) → 물리 (20,40,200,100)
+        assert_eq!(
+            crop_rect_px(10.0, 20.0, 100.0, 50.0, 2.0, 4000, 3000),
+            Some((20.0, 40.0, 200.0, 100.0))
+        );
+    }
+
+    #[test]
+    fn 이미지_경계로_클램프한다() {
+        // 오른쪽/아래로 벗어난 부분은 잘린다.
+        assert_eq!(
+            crop_rect_px(1900.0, 1000.0, 300.0, 300.0, 2.0, 4000, 2100),
+            Some((3800.0, 2000.0, 200.0, 100.0))
+        );
+        // 음수 원점은 0 으로.
+        assert_eq!(
+            crop_rect_px(-10.0, -10.0, 20.0, 20.0, 1.0, 100, 100),
+            Some((0.0, 0.0, 10.0, 10.0))
+        );
+    }
+
+    #[test]
+    fn 빈_또는_무효_crop_은_none() {
+        assert_eq!(crop_rect_px(0.0, 0.0, 0.0, 10.0, 2.0, 100, 100), None); // w=0
+        assert_eq!(crop_rect_px(0.0, 0.0, 10.0, 10.0, 0.0, 100, 100), None); // scale=0
+        assert_eq!(crop_rect_px(200.0, 0.0, 10.0, 10.0, 1.0, 100, 100), None); // 완전 밖
     }
 }

@@ -122,3 +122,11 @@ pub(crate) async fn arm_capture<R: Runtime>(_win: &Webview<R>) -> Result<(), Str
 }
 
 pub(crate) fn disarm_capture<R: Runtime>(_win: &Webview<R>) {}
+
+// snapshot_region — WebView2 CapturePreview 의 rect crop 은 아직 미구현(파일 스냅샷만 지원).
+pub(crate) async fn capture_region_png<R: Runtime>(
+    _win: &Webview<R>,
+    _rect: Option<(f64, f64, f64, f64)>,
+) -> Result<Vec<u8>, String> {
+    Err("snapshot_region: Windows 미구현".into())
+}

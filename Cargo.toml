@@ -20,6 +20,8 @@ tauri = { version = "2" }
 serde = { version = "1", features = ["derive"] }
 # 캡처한 PNG 프레임을 다시 읽어 영역 명도를 계산(analyze_regions). png 만 — 디코드 전용.
 image = { version = "0.25", default-features = false, features = ["png"] }
+# snapshot_region 반환 인코딩(디스크 미경유 base64 PNG).
+base64 = "0.22"
 
 [build-dependencies]
 tauri-plugin = { version = "2", features = ["build"] }
