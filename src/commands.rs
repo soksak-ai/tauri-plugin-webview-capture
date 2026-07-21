@@ -205,6 +205,8 @@ fn frame_diffs_blocking(dir: &str, regions: &[Region], thresh: u8) -> Result<Vec
 
 /// 논리(CSS px, 창 좌표) 직사각 → 물리(px) crop 사각. 이미지 경계로 클램프.
 /// 폭/높이가 0 이하로 잘리면 None(빈 crop 은 캡처 실패보다 명시적 거절이 낫다).
+/// 순수 함수 — 테스트가 경계/클램프를 덮는다(crop 커맨드 배선은 소비처가 생기면).
+#[allow(dead_code)]
 pub(crate) fn crop_rect_px(
     x: f64,
     y: f64,
